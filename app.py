@@ -8,6 +8,14 @@ DASHBOARD_URL = "https://erp.psit.ac.in/Student/Dashboard"
 
 st.set_page_config(page_title="PSIT ERP Attendance Tracker", layout="centered")
 
+st.markdown("""
+<style>
+footer {visibility: hidden;}
+header {visibility: hidden;}
+[data-testid="stToolbar"] { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
+
 st.title("📚 PSIT Attendance & Fine Checker")
 
 st.write("Enter your ERP credentials below:")
