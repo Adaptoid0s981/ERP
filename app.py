@@ -8,6 +8,15 @@ DASHBOARD_URL = "https://erp.psit.ac.in/Student/Dashboard"
 
 st.set_page_config(page_title="PSIT Attendance Tracker", layout="centered")
 
+# --------- HIDE STREAMLIT HEADER, FOOTER & MENU ----------
+st.markdown("""
+<style>
+header {visibility: hidden;}
+footer {visibility: hidden;}
+[data-testid="stToolbar"] { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
+
 st.title("📚 PSIT Attendance & Fine Tracker")
 
 # ---------------- INPUTS ----------------
@@ -68,7 +77,7 @@ if st.button("🔓 Login & Fetch Data"):
         # ============== BUTTON 1: Lectures needed to reach 90% ==============
         if st.button("📈 How many lectures needed to reach 90%?"):
             if without_pf >= 90:
-                st.success("🔥 You already have 90% or more. No extra lectures needed.")
+                st.success("🔥 Your attendance is already 90% or more. No extra lectures needed.")
             else:
                 present = P
                 total = TL
@@ -108,4 +117,5 @@ if st.button("🔓 Login & Fetch Data"):
 
     except Exception as e:
         st.error(f"⚠ Unexpected error: {e}")
+
 
