@@ -107,10 +107,10 @@ if "session" in st.session_state:
 
         # A) Reach 90%
         if st.button("📈 How many extra lectures needed to reach 90%?"):
-            if wopf >= 90:
+            if wpf >= 90:
                 st.success("🔥 You already have 90% or more.")
             else:
-                present, total, count, proj = P, TL, 0, wopf
+                present, total, count, proj = P, TL, 0, wpf
                 while proj < 90:
                     present += 1
                     total += 1
@@ -120,7 +120,7 @@ if "session" in st.session_state:
 
         # B) Bunk calculator
         if st.button("😎 How many lectures can I bunk & still remain 90%?"):
-            if wopf < 90:
+            if wpf < 90:
                 st.warning("⚠ Attendance below 90%, no bunks allowed.")
             else:
                 bunkable = int((P - 0.90 * TL) / 0.90)
