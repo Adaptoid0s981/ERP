@@ -101,7 +101,8 @@ if "session" in st.session_state:
         st.write(f"Total Lectures: **{TL}**")
         st.write(f"Present: **{P}**")
         st.write(f"Absent: **{Ab}**")
-        st.write(f"Without PF Attendance: **{wopf}%**")
+        st.write(f"Without PF Attendance: **{wopf}**")
+        st.write(f"With PF Attendance: **{wpf}%**")
         if fine:
             st.write(f"💰 Fine: **₹ {fine}**")
 
