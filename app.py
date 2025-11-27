@@ -2,13 +2,16 @@ import streamlit as st
 import requests
 from bs4 import BeautifulSoup
 import re
+import pandas as pd
+from datetime import date
 
 LOGIN_URL = "https://erp.psit.ac.in/Erp/Auth"
 DASHBOARD_URL = "https://erp.psit.ac.in/Student/Dashboard"
+TIMETABLE_URL = "https://erp.psit.ac.in/Student/TimeTable"
 
-st.set_page_config(page_title="PSIT Attendance Tracker", layout="centered")
+st.set_page_config(page_title="PSIT Student Toolkit", layout="centered")
 
-# Hide Streamlit header, footer and toolbar
+# Hide Streamlit header, footer, menu
 st.markdown("""
 <style>
 header {visibility: hidden;}
@@ -17,19 +20,15 @@ footer {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📚 PSIT Attendance & Fine Tracker")
+st.title("🎓 PSIT Student Toolkit")
 
-# ---------------- INPUTS ----------------
+# ---------------- LOGIN ----------------
 user = st.text_input("User ID / Roll Number")
 password = st.text_input("Password", type="password")
 
-
-# ------------------------------------------------
-# LOGIN BUTTON
-# ------------------------------------------------
 if st.button("🔓 Login & Fetch Data"):
     if not user or not password:
-        st.error("⚠ Please enter both User ID and Password.")
+        st.error("⚠ Enter both User ID and Password.")
         st.stop()
 
     try:
@@ -37,8 +36,8 @@ if st.button("🔓 Login & Fetch Data"):
         payload = {"username": user, "password": password}
         session.post(LOGIN_URL, data=payload)
 
-        response = session.get(DASHBOARD_URL)
-        soup = BeautifulSoup(response.text, "html.parser")
+        dashboard = session.get(DASHBOARD_URL)
+        soup = BeautifulSoup(dashboard.text, "html.parser")
 
         h5_tags = soup.find_all("h5")
         if len(h5_tags) < 2:
@@ -52,14 +51,17 @@ if st.button("🔓 Login & Fetch Data"):
         TL = int(values.get("TL", 0))
         P = int(values.get("P", 0))
         Ab = int(values.get("Ab", 0))
-        with_pf, without_pf = map(float, re.findall(r"(\d+\.\d+)", percentages))
+        wpf, wopf = map(float, re.findall(r"(\d+\.\d+)", percentages))
 
-        # Save data permanently for other buttons
-        st.session_state["TL"] = TL
-        st.session_state["P"] = P
-        st.session_state["Ab"] = Ab
-        st.session_state["with_pf"] = with_pf
-        st.session_state["without_pf"] = without_pf
+        # Save attendance state for other tabs
+        st.session_state.update({
+            "session": session,
+            "TL": TL,
+            "P": P,
+            "Ab": Ab,
+            "wpf": wpf,
+            "wopf": wopf
+        })
 
         # Extract fine
         fine = None
@@ -71,81 +73,88 @@ if st.button("🔓 Login & Fetch Data"):
                 break
         st.session_state["fine"] = fine
 
-        st.success("🎉 Login Successful! Data saved for other buttons.")
-        st.subheader("📌 Attendance Summary")
-        st.write(f"**Total Lectures:** {TL}")
-        st.write(f"**Present:** {P}")
-        st.write(f"**Absent:** {Ab}")
-        st.write(f"**With PF:** {with_pf}%")
-        st.write(f"**Without PF:** {without_pf}%")
-        if fine:
-            st.write(f"💰 **Fine:** ₹ {fine}")
-
+        st.success("🎉 Login Successful! Data loaded.")
     except Exception as e:
-        st.error(f"⚠ Unexpected error: {e}")
+        st.error(f"⚠ Error: {e}")
 
 
-# ------------------------------------------------
-# BUTTON 1: Lectures needed to reach 90%
-# ------------------------------------------------
-if st.button("📈 How many lectures needed to reach 90%?"):
-    if "without_pf" not in st.session_state:
-        st.error("⚠ Please login first!")
-        st.stop()
+# ===== SHOW TABS ONLY AFTER LOGIN SUCCESS =====
+if "session" in st.session_state:
 
-    TL = st.session_state["TL"]
-    P = st.session_state["P"]
-    without_pf = st.session_state["without_pf"]
+    tabs = st.tabs(["📈 Attendance", "📅 Today's Timetable", "ℹ About"])
 
-    if without_pf >= 90:
-        st.success("🔥 You already have 90% or more. No extra lectures needed.")
-    else:
-        present = P
-        total = TL
-        needed = 0
-        projected = without_pf
+    # ------------ TAB 1: ATTENDANCE FEATURES ------------
+    with tabs[0]:
+        TL = st.session_state["TL"]
+        P = st.session_state["P"]
+        Ab = st.session_state["Ab"]
+        wpf = st.session_state["wpf"]
+        wopf = st.session_state["wopf"]
+        fine = st.session_state["fine"]
 
-        while projected < 90:
-            present += 1
-            total += 1
-            projected = (present / total) * 100
-            needed += 1
+        st.subheader("📌 Attendance Summary")
+        st.write(f"Total Lectures: **{TL}**")
+        st.write(f"Present: **{P}**")
+        st.write(f"Absent: **{Ab}**")
+        st.write(f"Without PF Attendance: **{wopf}%**")
+        if fine:
+            st.write(f"💰 Fine: **₹ {fine}**")
 
-        days = needed // 8
-        extra = needed % 8
+        # A) Reach 90%
+        if st.button("📈 How many lectures needed to reach 90%?"):
+            if wopf >= 90:
+                st.success("🔥 Already 90% or above.")
+            else:
+                present, total, count, proj = P, TL, 0, wopf
+                while proj < 90:
+                    present += 1
+                    total += 1
+                    proj = (present / total) * 100
+                    count += 1
+                st.info(f"➡ Need **{count} lectures** to reach 90%.")
 
-        st.subheader("📌 Requirement to Reach 90%")
-        st.write(f"➡ **Extra lectures required:** {needed}")
-        st.write(f"➡ **Equivalent to:** {days} days and {extra} lectures")
-        st.write(f"📌 **Projected attendance after completion:** {projected:.2f}%")
+        # B) Bunk calculator
+        if st.button("😎 How many lectures can I bunk & stay 90%?"):
+            if wopf < 90:
+                st.warning("⚠ Attendance below 90%, no bunks allowed.")
+            else:
+                bunkable = int((P - 0.90 * TL) / 0.90)
+                if bunkable <= 0:
+                    st.info("🚫 Cannot bunk any more lectures.")
+                else:
+                    st.success(f"💤 You can bunk **{bunkable} lectures** safely.")
 
+    # ------------ TAB 2: TIMETABLE ------------
+    with tabs[1]:
+        st.subheader("📅 Today's Timetable")
 
-# ------------------------------------------------
-# BUTTON 2: Lectures that can be bunked
-# ------------------------------------------------
-if st.button("😎 How many lectures can I bunk & stay 90%?"):
-    if "without_pf" not in st.session_state:
-        st.error("⚠ Please login first!")
-        st.stop()
+        try:
+            session = st.session_state["session"]
+            tt_res = session.get(TIMETABLE_URL)
+            soup = BeautifulSoup(tt_res.text, "html.parser")
 
-    TL = st.session_state["TL"]
-    P = st.session_state["P"]
-    without_pf = st.session_state["without_pf"]
+            table_div = soup.find("div", class_="table-responsive")
+            h5_tags = table_div.find_all("h5")
+            raw = [[t.strip() for t in h5.stripped_strings] for h5 in h5_tags]
+            raw = raw[8:]  # drop top portion
 
-    if without_pf < 90:
-        st.warning("⚠ Your attendance is already below 90%. No bunks allowed.")
-    else:
-        bunkable = int((P - 0.90 * TL) / 0.90)
+            day_index = date.today().weekday()  # Monday=0
+            start, end = 8 * day_index, 8 * (day_index + 1)
+            today = raw[start:end]
 
-        if bunkable <= 0:
-            st.info("🚫 You cannot bunk any lectures if you want to stay ≥ 90%.")
-        else:
-            days = bunkable // 8
-            extra = bunkable % 8
-            st.subheader("😎 Bunk Calculator")
-            st.write(f"💤 You can bunk **{bunkable} more lectures** safely.")
-            st.write(f"⏳ That is **{days} days and {extra} lectures**.")
-            st.write("📌 Attendance will remain **≥ 90%** after this.")
+            if today:
+                df = pd.DataFrame(today, columns=["Faculty", "Subject/Room", "Batch"])
+                df.index = df.index + 1
+                st.table(df)
+            else:
+                st.warning("No timetable found for today.")
+        except:
+            st.error("⚠ Could not fetch timetable.")
+
+    # ------------ TAB 3: ABOUT ------------
+    with tabs[2]:
+        st.info("Built for PSIT students — Attendance + Timetable Dashboard.")
+
 
 
 
